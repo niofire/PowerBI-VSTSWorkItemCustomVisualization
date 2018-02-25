@@ -31,28 +31,41 @@ module powerbi.extensibility.visual {
         private updateCount: number;
         private settings: VisualSettings;
         private textNode: Text;
-
+        private rootElement : HTMLElement;
         constructor(options: VisualConstructorOptions) {
             console.log('Visual constructor', options);
+            options.element.style.cursor = "default";
+            options.element.style.overflowY = 'auto';
             this.target = options.element;
-            this.updateCount = 0;
-            if (typeof document !== "undefined") {
-                const new_p: HTMLElement = document.createElement("p");
-                new_p.appendChild(document.createTextNode("Update count:"));
-                const new_em: HTMLElement = document.createElement("em");
-                this.textNode = document.createTextNode(this.updateCount.toString());
-                new_em.appendChild(this.textNode);
-                new_p.appendChild(new_em);
-                this.target.appendChild(new_p);
-            }
         }
 
         public update(options: VisualUpdateOptions) {
             this.settings = Visual.parseSettings(options && options.dataViews && options.dataViews[0]);
-            console.log('Visual update', options);
-            if (typeof this.textNode !== "undefined") {
-                this.textNode.textContent = (this.updateCount++).toString();
-            }
+            this.target.innerHTML="";
+
+            let viewModels = WorkItemViewModelGenerator.generate(options.dataViews[0].categorical);
+
+            viewModels.forEach((viewModel, index)=>{
+                this.target.appendChild(Visual.createPanel(viewModel));
+            })
+        }
+
+        private static createPanel(wit :WorkItemViewModel) : HTMLElement {
+            let panel = document.createElement("div");
+            panel.className = "panel panel-primary";
+
+            let featureTitle = document.createElement("div");
+            featureTitle.className = "panel-heading font-bold cursor-pointer";
+            featureTitle.textContent= wit.title;
+
+            panel.appendChild(featureTitle);
+
+            let content = document.createElement("div");
+            content.className = "panel-body overflow";
+            content.innerHTML = wit.htmlContent;
+            panel.appendChild(content);
+
+            return panel;
         }
 
         private static parseSettings(dataView: DataView): VisualSettings {
@@ -67,5 +80,28 @@ module powerbi.extensibility.visual {
         public enumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions): VisualObjectInstance[] | VisualObjectInstanceEnumerationObject {
             return VisualSettings.enumerateObjectInstances(this.settings || VisualSettings.getDefault(), options);
         }
+    }
+
+    export class WorkItemViewModelGenerator {
+
+        public static generate(dataViewCategorical : DataViewCategorical) : WorkItemViewModel[] {
+            
+            //Assumption is that the first col is the card title, second col is HTMl content
+            var output : WorkItemViewModel[] = new Array();
+
+            let titles = dataViewCategorical.categories[0].values;
+            let htmlContents = dataViewCategorical.categories[1].values;
+            
+            for(let i = 0; i < titles.length; ++i){
+                if(htmlContents[i] != null){
+                    output.push(new WorkItemViewModel(titles[i].toString(),htmlContents[i].toString()));
+                }
+            }
+            return output;
+        }
+    }
+
+    export class WorkItemViewModel {
+        constructor(public title : string, public htmlContent : string){}
     }
 }
